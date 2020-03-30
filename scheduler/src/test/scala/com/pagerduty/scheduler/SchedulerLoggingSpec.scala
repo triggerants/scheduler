@@ -4,7 +4,7 @@ import com.pagerduty.scheduler.dao.AttemptHistoryDao
 import com.pagerduty.scheduler.gauge.StaleTasksGauge
 import com.pagerduty.metrics.NullMetrics
 import com.pagerduty.scheduler.model.CompletionResult
-import com.pagerduty.scheduler.specutil.{ TaskAttemptFactory, TaskFactory, UnitSpec }
+import com.pagerduty.scheduler.specutil.{TaskAttemptFactory, TaskFactory, UnitSpec}
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.BeforeAndAfter
@@ -35,7 +35,10 @@ class SchedulerLoggingSpec extends UnitSpec with MockFactory with BeforeAndAfter
     val mockMetrics = new MockMetrics
     val mockAttemptHistoryDao = mock[AttemptHistoryDao]
     val logging = new Scheduler.LoggingImpl(
-      SchedulerSettings(ConfigFactory.load()), mockMetrics, Some(mockAttemptHistoryDao), mockLogger
+      SchedulerSettings(ConfigFactory.load()),
+      mockMetrics,
+      Some(mockAttemptHistoryDao),
+      mockLogger
     )
     val name = "test_name"
 
@@ -49,20 +52,12 @@ class SchedulerLoggingSpec extends UnitSpec with MockFactory with BeforeAndAfter
       logging.reportTaskAttemptFinished(partitionId, task, taskAttempt)
     }
 
-    "register a stale tasks gauge successfully" in {
-      class TestSchedulerKafkaConsumer extends SchedulerKafkaConsumer(
-        SchedulerSettings(ConfigFactory.load()),
-        ConfigFactory.load(), null, null, null, null, null, NullMetrics
-      ) {
-        override def countStaleTasks: Int = 1
-      }
-      val gauge = new StaleTasksGauge(new TestSchedulerKafkaConsumer)
+    "build a stale tasks gauge sample consumer" in {
+      val consumer = logging.staleTasksGaugeSampleConsumer
 
-      (mockLogger.info(_: String)).expects(*).once()
+      (mockLogger.info(_: String)).expects(*)
 
-      logging.registerStaleTasksGauge(gauge)
-
-      gauge.sample
+      consumer(1)
 
       eventually {
         mockMetrics.invocations should contain(AddMetricsInvocation("stale_task_count", Seq()))
